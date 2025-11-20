@@ -125,7 +125,7 @@ def make_secure_request(
 
 class ActivitiService:
     def get_process_instance(self, process_instance_id):
-        display_keys = ["id", "appName", "processDefinitionKey", "processDefinitionVersion", "status", "startDate", "lastModified"]
+        display_keys = ["id", "appName", "processDefinitionKey", "processDefinitionName", "processDefinitionVersion", "status", "startDate", "lastModified"]
         try:
             response = make_secure_request(
                 method="GET",
@@ -209,11 +209,12 @@ def index():
 @app.route("/api/process-instance/search")
 def search_process():
     process_instance_id = request.args.get("processId")
+    is_nested = request.args.get("nested", "false").lower() == "true"
     if not process_instance_id:
         return '<div class="alert alert-warning">Please enter a Process ID</div>'
 
     data = service.get_process_instance(process_instance_id)
-    return render_template("fragments/process_card.html", process=data)
+    return render_template("fragments/process_card.html", process=data, nested=is_nested)
 
 
 @app.route("/api/process-instance/<pid>/variables")

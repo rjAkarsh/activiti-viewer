@@ -1,13 +1,19 @@
 <div class="card border-primary">
     <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-        <h5 class="mb-0">Process Instance  (Tenant: {{ process.appName }})</h5>
-        <span class="badge bg-light text-dark">{{ process.status }}</span>
+        <h5 class="mb-0">{{ process.processDefinitionName }} Process</h5>
+        <div>
+            <span class="badge bg-light text-dark me-2">{{ process.status }}</span>
+            {% if nested %}
+            <button class="btn btn-xs btn-link text-white p-0" onclick="this.closest('.card').remove()">Hide</button>
+            {% endif %}
+        </div>
     </div>
     <div class="card-body">
         <div class="row mb-3">
             <div class="col-md-4"><strong>ID:</strong> {{ process.id }}</div>
             <div class="col-md-4"><strong>Key:</strong> {{ process.processDefinitionKey }}</div>
             <div class="col-md-4"><strong>Version:</strong> {{ process.processDefinitionVersion }}</div>
+            <div class="col-md-4"><strong>Tenant:</strong> {{ process.appName }}</div>
             <div class="col-md-4"><strong>Started:</strong> {{ process.startDate }}</div>
             <div class="col-md-4"><strong>Last Modified:</strong> {{ process.lastModified }}</div>
         </div>

@@ -13,12 +13,19 @@
             <div>
                 <strong>{{ sub.processDefinitionKey }}</strong> <span class="badge bg-success">{{ sub.status }}</span>
             </div>
-            <!-- Load this subprocess as a main view or nested? Let's just link to it -->
-            <button class="btn btn-sm btn-primary" 
-                    hx-get="/api/process-instance/search?processId={{ sub.id }}" 
-                    hx-target="#main-display">
-                Load Full View
-            </button>
+            <div class="btn-group">
+                <button class="btn btn-sm btn-secondary" 
+                        hx-get="/api/process-instance/search?processId={{ sub.id }}" 
+                        hx-target="#main-display">
+                    Load Full View
+                </button>
+                <button class="btn btn-sm btn-primary" 
+                        hx-get="/api/process-instance/search?processId={{ sub.id }}&nested=true" 
+                        hx-target="closest .nested-container"
+                        hx-swap="innerHTML">
+                    Show below
+                </button>
+            </div>
         </div>
     </div>
     {% else %}
