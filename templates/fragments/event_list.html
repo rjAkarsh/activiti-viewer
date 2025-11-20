@@ -1,0 +1,20 @@
+<div class="mt-3">
+    <div class="d-flex justify-content-between">
+        <h6 class="text-warning text-dark">{{ scope|capitalize }} Events {% if filter_val %}(Filter: "{{ filter_val }}"){% endif %}</h6>
+        <button class="btn btn-xs btn-link text-danger p-0" onclick="this.closest('.nested-container').innerHTML = ''">Hide</button>
+    </div>
+    
+    <div class="list-group">
+        {% for event in events %}
+        <div class="list-group-item list-group-item-action py-2">
+            <div class="d-flex w-100 justify-content-between">
+                <strong class="mb-1">{{ event.type }}</strong>
+                <small>{{ event.timestamp }}</small>
+            </div>
+            <small class="text-muted">{{ event.details }}</small>
+        </div>
+        {% else %}
+        <div class="text-muted">No events found matching criteria.</div>
+        {% endfor %}
+    </div>
+</div>

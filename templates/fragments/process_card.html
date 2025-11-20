@@ -1,0 +1,59 @@
+<div class="card border-primary">
+    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Process Instance: {{ process.name }}</h5>
+        <span class="badge bg-light text-dark">{{ process.status }}</span>
+    </div>
+    <div class="card-body">
+        <div class="row mb-3">
+            <div class="col-md-4"><strong>ID:</strong> {{ process.id }}</div>
+            <div class="col-md-4"><strong>Key:</strong> {{ process.businessKey }}</div>
+            <div class="col-md-4"><strong>Started:</strong> {{ process.startTime }}</div>
+        </div>
+
+        <!-- Process Actions -->
+        <div class="action-bar">
+            <small class="text-uppercase fw-bold text-muted">Actions:</small>
+            
+            <!-- Show Variables Button -->
+            <button class="btn btn-sm btn-outline-secondary"
+                    hx-get="/api/process-instance/{{ process.id }}/variables"
+                    hx-target="#proc-vars-{{ process.id }}"
+                    hx-swap="innerHTML">
+                📄 Variables
+            </button>
+
+            <!-- Show Subprocesses Button -->
+            <button class="btn btn-sm btn-outline-secondary"
+                    hx-get="/api/process-instance/{{ process.id }}/subprocesses"
+                    hx-target="#proc-subs-{{ process.id }}"
+                    hx-swap="innerHTML">
+                🔄 Subprocesses
+            </button>
+
+            <!-- Show User Tasks Button -->
+            <button class="btn btn-sm btn-outline-secondary"
+                    hx-get="/api/process-instance/{{ process.id }}/tasks"
+                    hx-target="#proc-tasks-{{ process.id }}"
+                    hx-swap="innerHTML">
+                👤 User Tasks
+            </button>
+
+            <!-- Show Events (Form with Filter) -->
+            <div class="d-flex gap-1 align-items-center border-start ps-2">
+                <input type="text" name="filter_text" class="form-control form-control-sm" placeholder="Filter Events..." style="width: 120px;">
+                <button class="btn btn-sm btn-outline-secondary"
+                        hx-get="/api/process/{{ process.id }}/events"
+                        hx-include="closest .action-bar" 
+                        hx-target="#proc-events-{{ process.id }}">
+                    📅 Events
+                </button>
+            </div>
+        </div>
+
+        <!-- Nested Containers (Targets for HTMX) -->
+        <div id="proc-vars-{{ process.id }}" class="nested-container"></div>
+        <div id="proc-subs-{{ process.id }}" class="nested-container"></div>
+        <div id="proc-tasks-{{ process.id }}" class="nested-container"></div>
+        <div id="proc-events-{{ process.id }}" class="nested-container"></div>
+    </div>
+</div>

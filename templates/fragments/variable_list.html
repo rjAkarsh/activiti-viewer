@@ -1,0 +1,18 @@
+<div class="mt-3">
+    <div class="d-flex justify-content-between">
+        <h6 class="text-primary">{{ scope }} Variables</h6>
+        <button class="btn btn-xs btn-link text-danger p-0" onclick="this.closest('.nested-container').innerHTML = ''">Hide</button>
+    </div>
+    <table class="table table-sm table-striped table-bordered">
+        <thead><tr><th>Name</th><th>Type</th><th>Value</th></tr></thead>
+        <tbody>
+            {% for var in variables %}
+            <tr>
+                <td>{{ var.name }}</td>
+                <td><code>{{ var.type }}</code></td>
+                <td>{{ var.value }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
