@@ -1,13 +1,15 @@
 <div class="card border-primary">
     <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-        <h5 class="mb-0">Process Instance: {{ process.name }}</h5>
+        <h5 class="mb-0">Process Instance  (Tenant: {{ process.appName }})</h5>
         <span class="badge bg-light text-dark">{{ process.status }}</span>
     </div>
     <div class="card-body">
         <div class="row mb-3">
             <div class="col-md-4"><strong>ID:</strong> {{ process.id }}</div>
-            <div class="col-md-4"><strong>Key:</strong> {{ process.businessKey }}</div>
-            <div class="col-md-4"><strong>Started:</strong> {{ process.startTime }}</div>
+            <div class="col-md-4"><strong>Key:</strong> {{ process.processDefinitionKey }}</div>
+            <div class="col-md-4"><strong>Version:</strong> {{ process.processDefinitionVersion }}</div>
+            <div class="col-md-4"><strong>Started:</strong> {{ process.startDate }}</div>
+            <div class="col-md-4"><strong>Last Modified:</strong> {{ process.lastModified }}</div>
         </div>
 
         <!-- Process Actions -->
@@ -40,7 +42,7 @@
 
             <!-- Show Events (Form with Filter) -->
             <div class="d-flex gap-1 align-items-center border-start ps-2">
-                <input type="text" name="filter_text" class="form-control form-control-sm" placeholder="Filter Events..." style="width: 120px;">
+                <input type="text" name="filter_text" class="form-control form-control-sm" placeholder="Filter Events..." style="width: 400px;">
                 <button class="btn btn-sm btn-outline-secondary"
                         hx-get="/api/process/{{ process.id }}/events"
                         hx-include="closest .action-bar" 

@@ -2,100 +2,200 @@ import time
 from flask import Flask, render_template, request
 from faker import Faker
 import random
+import requests
+from typing import Optional, Dict, Any
+import logging
 
 app = Flask(__name__)
 fake = Faker()
 
+ACTIVITI_HOST_URL = "http://host.docker.internal"
+QUERY_SERVICE_URL = f"{ACTIVITI_HOST_URL}/query/admin/v1"
+RB_APPROVAL_WORKFLOW_SERVICE_URL = f"{ACTIVITI_HOST_URL}/rb-approval-workflow/admin/v1"
 
-# --- MOCK DATA SERVICE (Simulates a Process Engine DB) ---
-class MockDataService:
-    def get_process_instance(self, p_id):
-        # Simulate DB fetch
-        return {
-            "id": p_id,
-            "name": f"Order_Processing_{p_id}",
-            "status": random.choice(["ACTIVE", "COMPLETED", "SUSPENDED"]),
-            "startTime": fake.iso8601(),
-            "businessKey": fake.bothify(text="ORD-####-????"),
+class OAuth2Manager:
+    """
+    Manages OAuth2 Client Credentials flow token lifecycle.
+    Auto-refreshes token if expired.
+    """
+    def __init__(self, token_url: str, client_id: str, client_secret: str, scope: str = None):
+        self.token_url = token_url
+        self.client_id = client_id
+        self.client_secret = client_secret
+        self.scope = scope
+        self._access_token = None
+        self._token_expiry = 0
+
+    def _fetch_new_token(self):
+        """Fetches a new access token from the provider."""
+        payload = {
+            'grant_type': 'client_credentials',
+            'client_id': self.client_id,
+            'client_secret': self.client_secret
         }
+        if self.scope:
+            payload['scope'] = self.scope
+
+        try:
+            response = requests.post(self.token_url, data=payload)
+            response.raise_for_status()
+            data = response.json()
+            
+            self._access_token = data['access_token']
+            # Set expiry time (subtract 60s buffer to be safe)
+            expires_in = data.get('expires_in', 3600)
+            self._token_expiry = time.time() + expires_in - 60
+            print("DEBUG: New OAuth2 token fetched successfully.")
+            
+        except requests.RequestException as e:
+            print(f"ERROR: Failed to obtain OAuth2 token: {e}")
+            raise
+
+    def get_token(self) -> str:
+        """Returns a valid access token, refreshing if necessary."""
+        if not self._access_token or time.time() >= self._token_expiry:
+            self._fetch_new_token()
+        return self._access_token
+
+auth_manager = OAuth2Manager(
+    token_url=f"{ACTIVITI_HOST_URL}/auth/realms/activiti/protocol/openid-connect/token",
+    client_id="core-workflow-service",
+    client_secret="f32a1727-f98b-4def-ba9b-518279e926eb"
+)
+
+def make_secure_request(
+    method: str,
+    endpoint: str,
+    params: Optional[Dict[str, Any]] = None,
+    payload: Optional[Dict[str, Any]] = None,
+    headers: Optional[Dict[str, str]] = None,
+    timeout: int = 30
+) -> requests.Response:
+    """
+    Generic function to make HTTP calls with automatic OAuth2 Bearer Token attachment.
+    
+    Args:
+        method (str): HTTP method (GET, POST, PUT, DELETE, etc.)
+        endpoint (str): Full URL or relative path.
+        params (dict): Query parameters.
+        payload (dict): JSON body for POST/PUT.
+        headers (dict): Custom headers.
+        timeout (int): Request timeout in seconds.
+        
+    Returns:
+        requests.Response: The response object.
+    """
+    
+    # 1. Get Valid Token
+    try:
+        token = auth_manager.get_token()
+    except Exception as e:
+        raise RuntimeError(f"Authentication failed: {str(e)}")
+
+    # 2. Prepare Headers
+    if headers is None:
+        headers = {}
+    
+    # Attach Bearer Token
+    headers['Authorization'] = f"Bearer {token}"
+    
+    # Ensure Content-Type is JSON if payload exists and not set otherwise
+    if payload and 'Content-Type' not in headers:
+        headers['Content-Type'] = 'application/json'
+
+    # 3. Execute Request
+    try:
+        response = requests.request(
+            method=method.upper(),
+            url=endpoint,
+            params=params,
+            json=payload, # Using 'json' parameter automatically serializes dict
+            headers=headers,
+            timeout=timeout
+        )
+        
+        # Optional: Raise error for 4xx or 5xx status codes immediately
+        # response.raise_for_status() 
+        
+        return response
+
+    except requests.RequestException as e:
+        print(f"HTTP Request failed: {e}")
+        raise
+
+class ActivitiService:
+    def get_process_instance(self, process_instance_id):
+        display_keys = ["id", "appName", "processDefinitionKey", "processDefinitionVersion", "status", "startDate", "lastModified"]
+        try:
+            response = make_secure_request(
+                method="GET",
+                endpoint=f"{QUERY_SERVICE_URL}/process-instances/{process_instance_id}",
+            )
+            data = response.json()
+            return {k: v for k, v in data.items() if k in display_keys}
+        except Exception as e:
+            print(f"Error fetching process instance: {e}")
+            return None
 
     def get_variables(self, parent_id, scope="process"):
-        # Generate 3-5 random variables
-        return [
-            {"name": "amount", "value": random.randint(100, 5000), "type": "Integer"},
-            {"name": "customerName", "value": fake.name(), "type": "String"},
-            {
-                "name": "isPriority",
-                "value": random.choice(["true", "false"]),
-                "type": "Boolean",
-            },
-            {
-                "name": "riskLevel",
-                "value": random.choice(["Low", "Medium", "High"]),
-                "type": "String",
-            },
-        ]
+        display_keys = ["name", "type", "value", "createTime", "lastUpdatedTime"]
+        # Note that value can be a string, number or a JSON object
+        try:
+            response = make_secure_request(
+                method="GET",
+                endpoint=f"{QUERY_SERVICE_URL}/process-instances/{parent_id}/variables?size=1000" if scope == "process" else f"{QUERY_SERVICE_URL}/tasks/{parent_id}/variables?size=1000",
+            )
+            data = response.json().get("_embedded", {}).get("variables", [])
+            return [{k: v for k, v in d.items() if k in display_keys} for d in data]
+        except Exception as e:
+            print(f"Error fetching variables: {e}")
+            return None
 
-    def get_user_tasks(self, process_id):
-        # Generate 2-4 tasks
-        return [
-            {
-                "id": fake.uuid4(),
-                "name": random.choice(
-                    ["Approve Order", "Check Inventory", "Validate Fraud", "Ship Goods"]
-                ),
-                "assignee": fake.first_name(),
-                "created": fake.iso8601(),
-            }
-            for _ in range(random.randint(2, 4))
-        ]
+    def get_user_tasks(self, process_instance_id):
+        display_keys = ["id", "name", "taskDefinitionKey", "status", "assignee", "createdDate", "lastModified"]
+        try:
+            response = make_secure_request(
+                method="GET",
+                endpoint=f"{QUERY_SERVICE_URL}/tasks?size=1000&processInstanceId={process_instance_id}",
+            )
+            data = response.json().get("_embedded", {}).get("tasks", [])
+            return [{k: v for k, v in d.items() if k in display_keys} for d in data]
+        except Exception as e:
+            print(f"Error fetching user tasks: {e}")
+            return None
 
-    def get_subprocesses(self, process_id):
-        # Generate 0-2 subprocesses
-        if random.random() > 0.5:
-            return []
-        return [{"id": fake.uuid4(), "name": "Payment_Subprocess", "status": "ACTIVE"}]
+    def get_subprocesses(self, process_instance_id):
+        display_keys = ["id", "appName", "processDefinitionKey", "processDefinitionVersion", "status", "startDate", "lastModified"]
+        try:
+            response = make_secure_request(
+                method="GET",
+                endpoint=f"{ACTIVITI_HOST_URL}/query/v1/process-instances/{process_instance_id}/subprocesses?size=1000",
+            )
+            data = response.json().get("_embedded", {}).get("processInstances", [])
+            return [{k: v for k, v in d.items() if k in display_keys} for d in data]
+        except Exception as e:
+            print(f"Error fetching subprocesses: {e}")
+            return None
 
     def get_events(self, parent_id, filter_text=""):
-        # Generate list of events
-        all_events = [
-            {
-                "id": fake.uuid4(),
-                "type": "PROCESS_STARTED",
-                "timestamp": fake.iso8601(),
-                "details": "Start event triggered",
-            },
-            {
-                "id": fake.uuid4(),
-                "type": "VARIABLE_UPDATED",
-                "timestamp": fake.iso8601(),
-                "details": "Amount changed",
-            },
-            {
-                "id": fake.uuid4(),
-                "type": "USER_TASK_CREATED",
-                "timestamp": fake.iso8601(),
-                "details": "Task created",
-            },
-            {
-                "id": fake.uuid4(),
-                "type": "SERVICE_TASK_FAIL",
-                "timestamp": fake.iso8601(),
-                "details": "Timeout exception",
-            },
-        ]
-
-        if filter_text:
-            return [
-                e
-                for e in all_events
-                if filter_text.lower() in e["type"].lower()
-                or filter_text.lower() in e["details"].lower()
-            ]
-        return all_events
+        display_keys = ["id", "entityId", "sequenceNumber", "eventType", "entity"]
+        try:
+            endpoint = f"{ACTIVITI_HOST_URL}/audit/v1/events?size=1000&sort=sequenceNumber&search=processInstanceId:{parent_id}"
+            if filter_text:
+                endpoint += f"&search={filter_text}"
+            response = make_secure_request(
+                method="GET",
+                endpoint=endpoint,
+            )
+            print(endpoint)
+            data = response.json().get("_embedded", {}).get("events", [])
+            return [{k: v for k, v in d.items() if k in display_keys} for d in data]
+        except Exception as e:
+            print(f"Error fetching events: {e}")
+            return None
 
 
-service = MockDataService()
+service = ActivitiService()
 
 # --- ROUTES ---
 
@@ -108,11 +208,11 @@ def index():
 # 1. Process Instance Routes
 @app.route("/api/process-instance/search")
 def search_process():
-    p_id = request.args.get("processId")
-    if not p_id:
+    process_instance_id = request.args.get("processId")
+    if not process_instance_id:
         return '<div class="alert alert-warning">Please enter a Process ID</div>'
 
-    data = service.get_process_instance(p_id)
+    data = service.get_process_instance(process_instance_id)
     return render_template("fragments/process_card.html", process=data)
 
 

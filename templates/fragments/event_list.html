@@ -7,11 +7,37 @@
     <div class="list-group">
         {% for event in events %}
         <div class="list-group-item list-group-item-action py-2">
-            <div class="d-flex w-100 justify-content-between">
-                <strong class="mb-1">{{ event.type }}</strong>
-                <small>{{ event.timestamp }}</small>
+            <!-- Main Row -->
+            <div class="d-flex w-100 justify-content-between align-items-center">
+                <div class="d-flex gap-3">
+                    <strong class="mb-1">{{ event.eventType }}</strong>
+                    <!-- Toggle Button -->
+                    {% if event.entity %}
+                    <a class="small text-primary text-decoration-none" 
+                       data-bs-toggle="collapse" 
+                       href="#entity-{{ event.id }}" 
+                       role="button" 
+                       aria-expanded="false">
+                       View Entity ▾
+                    </a>
+                    {% endif %}
+                </div>
+                <div class="text-end">
+                    <small class="d-block">{{ event.entityId }}</small>
+                    <small class="text-muted">{{ event.id }}</small>
+                </div>
             </div>
-            <small class="text-muted">{{ event.details }}</small>
+
+            <!-- Collapsible JSON Content -->
+            {% if event.entity %}
+            <div class="collapse mt-2" id="entity-{{ event.id }}">
+                <div class="card card-body bg-light border-0 p-2">
+                    <small class="text-muted fw-bold mb-1">Entity Payload:</small>
+                    <!-- 'tojson' pretty prints the dictionary -->
+                    <pre class="mb-0 text-secondary" style="font-size: 0.75rem; white-space: pre-wrap;"><code>{{ event.entity | tojson(indent=2) }}</code></pre>
+                </div>
+            </div>
+            {% endif %}
         </div>
         {% else %}
         <div class="text-muted">No events found matching criteria.</div>
