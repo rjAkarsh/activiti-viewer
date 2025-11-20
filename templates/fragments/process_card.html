@@ -29,15 +29,7 @@
                     hx-swap="innerHTML">
                 📄 Variables
             </button>
-
-            <!-- Show Subprocesses Button -->
-            <button class="btn btn-sm btn-outline-secondary"
-                    hx-get="/api/process-instance/{{ process.id }}/subprocesses"
-                    hx-target="#proc-subs-{{ process.id }}"
-                    hx-swap="innerHTML">
-                🔄 Subprocesses
-            </button>
-
+            
             <!-- Show User Tasks Button -->
             <button class="btn btn-sm btn-outline-secondary"
                     hx-get="/api/process-instance/{{ process.id }}/tasks"
@@ -47,7 +39,7 @@
             </button>
 
             <!-- Show Events (Form with Filter) -->
-            <div class="d-flex gap-1 align-items-center border-start ps-2">
+            <div class="d-flex gap-1 align-items-center border-start border-2 ps-2">
                 <input type="text" name="filter_text" class="form-control form-control-sm" placeholder="Filter Events..." style="width: 400px;">
                 <button class="btn btn-sm btn-outline-secondary"
                         hx-get="/api/process/{{ process.id }}/events"
@@ -56,12 +48,24 @@
                     📅 Events
                 </button>
             </div>
+
+            <!-- Show Subprocesses Button -->
+            <div class="border-start border-2 ps-2">
+                <button class="btn btn-sm btn-outline-secondary"
+                        hx-get="/api/process-instance/{{ process.id }}/subprocesses"
+                        hx-target="#proc-subs-{{ process.id }}"
+                        hx-swap="innerHTML">
+                    🔄 Subprocesses
+                </button>
+            </div>
         </div>
 
         <!-- Nested Containers (Targets for HTMX) -->
-        <div id="proc-vars-{{ process.id }}" class="nested-container"></div>
-        <div id="proc-subs-{{ process.id }}" class="nested-container"></div>
-        <div id="proc-tasks-{{ process.id }}" class="nested-container"></div>
-        <div id="proc-events-{{ process.id }}" class="nested-container"></div>
+        <div class="vstack gap-0">
+            <div id="proc-vars-{{ process.id }}" class="nested-container"></div>
+            <div id="proc-tasks-{{ process.id }}" class="nested-container"></div>
+            <div id="proc-events-{{ process.id }}" class="nested-container"></div>
+            <div id="proc-subs-{{ process.id }}" class="nested-container"></div>
+        </div>
     </div>
 </div>
