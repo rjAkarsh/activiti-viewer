@@ -13,12 +13,16 @@ ACTIVITI_HOST_URL = "http://host.docker.internal"
 QUERY_SERVICE_URL = f"{ACTIVITI_HOST_URL}/query/admin/v1"
 RB_APPROVAL_WORKFLOW_SERVICE_URL = f"{ACTIVITI_HOST_URL}/rb-approval-workflow/admin/v1"
 
+
 class OAuth2Manager:
     """
     Manages OAuth2 Client Credentials flow token lifecycle.
     Auto-refreshes token if expired.
     """
-    def __init__(self, token_url: str, client_id: str, client_secret: str, scope: str = None):
+
+    def __init__(
+        self, token_url: str, client_id: str, client_secret: str, scope: str = None
+    ):
         self.token_url = token_url
         self.client_id = client_id
         self.client_secret = client_secret
@@ -29,24 +33,24 @@ class OAuth2Manager:
     def _fetch_new_token(self):
         """Fetches a new access token from the provider."""
         payload = {
-            'grant_type': 'client_credentials',
-            'client_id': self.client_id,
-            'client_secret': self.client_secret
+            "grant_type": "client_credentials",
+            "client_id": self.client_id,
+            "client_secret": self.client_secret,
         }
         if self.scope:
-            payload['scope'] = self.scope
+            payload["scope"] = self.scope
 
         try:
             response = requests.post(self.token_url, data=payload)
             response.raise_for_status()
             data = response.json()
-            
-            self._access_token = data['access_token']
+
+            self._access_token = data["access_token"]
             # Set expiry time (subtract 60s buffer to be safe)
-            expires_in = data.get('expires_in', 3600)
+            expires_in = data.get("expires_in", 3600)
             self._token_expiry = time.time() + expires_in - 60
             print("DEBUG: New OAuth2 token fetched successfully.")
-            
+
         except requests.RequestException as e:
             print(f"ERROR: Failed to obtain OAuth2 token: {e}")
             raise
@@ -57,11 +61,13 @@ class OAuth2Manager:
             self._fetch_new_token()
         return self._access_token
 
+
 auth_manager = OAuth2Manager(
     token_url=f"{ACTIVITI_HOST_URL}/auth/realms/activiti/protocol/openid-connect/token",
     client_id="core-workflow-service",
-    client_secret="f32a1727-f98b-4def-ba9b-518279e926eb"
+    client_secret="cf66490b-1ca0-42cb-b089-af4f9450f23d",
 )
+
 
 def make_secure_request(
     method: str,
@@ -69,11 +75,11 @@ def make_secure_request(
     params: Optional[Dict[str, Any]] = None,
     payload: Optional[Dict[str, Any]] = None,
     headers: Optional[Dict[str, str]] = None,
-    timeout: int = 30
+    timeout: int = 30,
 ) -> requests.Response:
     """
     Generic function to make HTTP calls with automatic OAuth2 Bearer Token attachment.
-    
+
     Args:
         method (str): HTTP method (GET, POST, PUT, DELETE, etc.)
         endpoint (str): Full URL or relative path.
@@ -81,11 +87,11 @@ def make_secure_request(
         payload (dict): JSON body for POST/PUT.
         headers (dict): Custom headers.
         timeout (int): Request timeout in seconds.
-        
+
     Returns:
         requests.Response: The response object.
     """
-    
+
     # 1. Get Valid Token
     try:
         token = auth_manager.get_token()
@@ -95,13 +101,13 @@ def make_secure_request(
     # 2. Prepare Headers
     if headers is None:
         headers = {}
-    
+
     # Attach Bearer Token
-    headers['Authorization'] = f"Bearer {token}"
-    
+    headers["Authorization"] = f"Bearer {token}"
+
     # Ensure Content-Type is JSON if payload exists and not set otherwise
-    if payload and 'Content-Type' not in headers:
-        headers['Content-Type'] = 'application/json'
+    if payload and "Content-Type" not in headers:
+        headers["Content-Type"] = "application/json"
 
     # 3. Execute Request
     try:
@@ -109,23 +115,33 @@ def make_secure_request(
             method=method.upper(),
             url=endpoint,
             params=params,
-            json=payload, # Using 'json' parameter automatically serializes dict
+            json=payload,  # Using 'json' parameter automatically serializes dict
             headers=headers,
-            timeout=timeout
+            timeout=timeout,
         )
-        
+
         # Optional: Raise error for 4xx or 5xx status codes immediately
-        # response.raise_for_status() 
-        
+        # response.raise_for_status()
+
         return response
 
     except requests.RequestException as e:
         print(f"HTTP Request failed: {e}")
         raise
 
+
 class ActivitiService:
     def get_process_instance(self, process_instance_id):
-        display_keys = ["id", "appName", "processDefinitionKey", "processDefinitionName", "processDefinitionVersion", "status", "startDate", "lastModified"]
+        display_keys = [
+            "id",
+            "appName",
+            "processDefinitionKey",
+            "processDefinitionName",
+            "processDefinitionVersion",
+            "status",
+            "startDate",
+            "lastModified",
+        ]
         try:
             response = make_secure_request(
                 method="GET",
@@ -143,7 +159,11 @@ class ActivitiService:
         try:
             response = make_secure_request(
                 method="GET",
-                endpoint=f"{QUERY_SERVICE_URL}/process-instances/{parent_id}/variables?size=1000" if scope == "process" else f"{QUERY_SERVICE_URL}/tasks/{parent_id}/variables?size=1000",
+                endpoint=(
+                    f"{QUERY_SERVICE_URL}/process-instances/{parent_id}/variables?size=1000"
+                    if scope == "process"
+                    else f"{QUERY_SERVICE_URL}/tasks/{parent_id}/variables?size=1000"
+                ),
             )
             data = response.json().get("_embedded", {}).get("variables", [])
             return [{k: v for k, v in d.items() if k in display_keys} for d in data]
@@ -152,7 +172,15 @@ class ActivitiService:
             return None
 
     def get_user_tasks(self, process_instance_id):
-        display_keys = ["id", "name", "taskDefinitionKey", "status", "assignee", "createdDate", "lastModified"]
+        display_keys = [
+            "id",
+            "name",
+            "taskDefinitionKey",
+            "status",
+            "assignee",
+            "createdDate",
+            "lastModified",
+        ]
         try:
             response = make_secure_request(
                 method="GET",
@@ -165,7 +193,15 @@ class ActivitiService:
             return None
 
     def get_subprocesses(self, process_instance_id):
-        display_keys = ["id", "appName", "processDefinitionKey", "processDefinitionVersion", "status", "startDate", "lastModified"]
+        display_keys = [
+            "id",
+            "appName",
+            "processDefinitionKey",
+            "processDefinitionVersion",
+            "status",
+            "startDate",
+            "lastModified",
+        ]
         try:
             response = make_secure_request(
                 method="GET",
@@ -180,7 +216,7 @@ class ActivitiService:
     def get_events(self, parent_id, filter_text=""):
         display_keys = ["id", "entityId", "sequenceNumber", "eventType", "entity"]
         try:
-            endpoint = f"{ACTIVITI_HOST_URL}/audit/v1/events?size=1000&sort=sequenceNumber&search=processInstanceId:{parent_id}"
+            endpoint = f"{ACTIVITI_HOST_URL}/audit/v1/events?size=1000&sort=timestamp,sequenceNumber&search=processInstanceId:{parent_id}"
             if filter_text:
                 endpoint += f"&search={filter_text}"
             response = make_secure_request(
@@ -214,7 +250,9 @@ def search_process():
         return '<div class="alert alert-warning">Please enter a Process ID</div>'
 
     data = service.get_process_instance(process_instance_id)
-    return render_template("fragments/process_card.html", process=data, nested=is_nested)
+    return render_template(
+        "fragments/process_card.html", process=data, nested=is_nested
+    )
 
 
 @app.route("/api/process-instance/<pid>/variables")
